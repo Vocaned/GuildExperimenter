@@ -1,0 +1,13 @@
+[package]
+name = "guild_experimenter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4.17"
+env_logger = "0.10.0"
+serde = {version = "1.0.156", features = ["derive"]}
+reqwest = {version = "0.11.14", features = ["json", "blocking"]}
+fasthash = "0.4.0"
