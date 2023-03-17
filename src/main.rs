@@ -12,6 +12,12 @@ struct APIReponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+struct ChannelResponse {
+    id: String,
+    r#type: i32
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct InviteResponse {
     code: String
 }
@@ -59,6 +65,7 @@ fn create_guild(client: &Client, experiment: &String) {
             }
         };
 
+        // mmh3 hash of b"experiment:id" modulo 10,000
         let bucket: u32 = Hash32::hash(format!("{}:{}", experiment, guild_id).as_bytes()) % 10000;
         if tmprange_max > bucket && bucket > tmprange_min {
             info!("Server with {} found! ID: {}", experiment, guild_id);
@@ -94,9 +101,9 @@ fn create_guild_invite(client: &Client, guild_id: &String) -> String {
 
     let channel_id: String = match res.status() {
         reqwest::StatusCode::OK => {
-            match res.json::<Vec<APIReponse>>() {
+            match res.json::<Vec<ChannelResponse>>() {
                 Ok(channels) => {
-                    channels[0].id.to_owned()
+                    channels.iter().find(|c| c.r#type == 0).unwrap().id.to_owned()
                 },
                 Err(err) => {
                     panic!("Could not parse channels API response: {:?}", err);
@@ -118,7 +125,7 @@ fn create_guild_invite(client: &Client, guild_id: &String) -> String {
     };
 
     match res.status() {
-        reqwest::StatusCode::CREATED => {
+        reqwest::StatusCode::OK => {
             match res.json::<InviteResponse>() {
                 Ok(invite) => {
                     invite.code
