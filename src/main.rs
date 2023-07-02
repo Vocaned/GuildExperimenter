@@ -26,7 +26,7 @@ fn create_guild(client: &Client, experiment: &String) {
     let delay_secs: u64 = 60;
 
     let tmprange_min: u32 = 0;
-    let tmprange_max: u32 = 100;
+    let tmprange_max: u32 = 1200;
 
     info!("{} target ranges: {}-{}", experiment, tmprange_min, tmprange_max);
 
@@ -65,15 +65,14 @@ fn create_guild(client: &Client, experiment: &String) {
             }
         };
 
-        // mmh3 hash of b"experiment:id" modulo 10,000
-        let bucket: u32 = Hash32::hash(format!("{}:{}", experiment, guild_id).as_bytes()) % 10000;
-        if tmprange_max > bucket && bucket > tmprange_min {
-            info!("Server with {} found! ID: {}", experiment, guild_id);
+        let placement: u32 = Hash32::hash(format!("{}:{}", experiment, guild_id).as_bytes()) % 10000;
+        if tmprange_max > placement && placement > tmprange_min {
+            info!("Server with {} found! [{}; {}]", experiment, guild_id, placement);
             info!("Server invite: https://discord.gg/{}", create_guild_invite(client, &guild_id));
             break;
         } else {
             tries += 1;
-            debug!("Attempt {} [{}; {}] failed, trying again in {} seconds.", tries, guild_id, bucket, delay_secs);
+            info!("Attempt {} [{}; {}] failed, trying again in {} seconds.", tries, guild_id, placement, delay_secs);
 
             let req = client.delete(format!("{}/guilds/{}", API, guild_id))
             .send();
@@ -116,7 +115,7 @@ fn create_guild_invite(client: &Client, guild_id: &String) -> String {
     };
 
     let req = client.post(format!("{}/channels/{}/invites", API, channel_id))
-    .json(&HashMap::from([("unique", true)]))
+    .json(&HashMap::from([("max_age", 0)]))
     .send();
 
     let res = match req {
@@ -147,8 +146,15 @@ fn transfer_ownership(client: &Client, guild_id: &String, user_id: &String) {
     .send();
 
     match req {
-        Ok(res) => if res.status() != reqwest::StatusCode::OK { panic!("Unknown error while transferring guild ownership: {:?}", res); },
+        Ok(res) => if res.status() != reqwest::StatusCode::NO_CONTENT { panic!("Unknown error while transferring guild ownership: {:?}", res); },
         Err(error) => panic!("Error trying to transfer guild ownership: {:?}", error),
+    };
+
+    let req = client.delete(format!("{}/users/@me/guilds/{}", API, guild_id)).send();
+
+    match req {
+        Ok(res) => if res.status() != reqwest::StatusCode::OK { panic!("Unknown error while leaving guild: {:?}", res); },
+        Err(error) => panic!("Error trying to leave guild: {:?}", error),
     };
 
     info!("Ownership of guild {} was transferred to {}", guild_id, user_id);
@@ -166,7 +172,7 @@ fn main() {
     env_logger::init();
 
     let args: Vec<String> = env::args().collect();
-    if args.len() == 1 { print_usage(&args) };
+    if args.len() < 3 { print_usage(&args) };
 
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("Authorization", format!("Bot {}", &args[1]).parse().unwrap());
